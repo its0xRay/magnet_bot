@@ -1,5 +1,6 @@
 // src/openai/api.rs
-use reqwest;
+use reqwest::blocking;
+use serde_json::json;
 
 pub struct OpenAIAPI {
     config: super::config::OpenAIConfig,
@@ -24,13 +25,15 @@ impl OpenAIAPI {
         // Create the request headers with the API key
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert("Content-Type", reqwest::header::HeaderValue::from_static("application/json"));
-        headers.insert("Authorization", reqwest::header::HeaderValue::from_str(&format!("Bearer {}", self.config.api_key))?);
+        let auth_header_value = reqwest::header::HeaderValue::from_str(&format!("Bearer {}", self.config.api_key)).map_err(|e| reqwest::Error::from(e.into()))?;
+        headers.insert("Authorization", auth_header_value);
 
         // Make the HTTP POST request to the OpenAI API
         let client = reqwest::blocking::Client::new();
         let response = client.post(api_url)
             .headers(headers)
-            .json(&payload)
+            //.json(&payload)
+            .body(reqwest::blocking::multipart::Form::new().text("prompt", prompt).text("max_tokens", max_tokens.to_string()))
             .send()?;
 
         // Check if the request was successful (status code 200)
