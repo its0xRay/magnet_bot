@@ -1,40 +1,26 @@
-// src/main.rs
-mod openai;
-mod chatbot;
-
-use dotenv::dotenv;
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use serde::{Deserialize, Serialize};
 use std::env;
 
-fn main() {
-    // Load environment variables from a .env file
-    dotenv().ok();
+#[derive(Debug, Deserialize, Serialize)]
+struct ChatMessage {
+    message: String,
+}
 
-    // Get the OpenAI API key from the environment variables
-    let openai_api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not found in .env");
+async fn chatbot(message: web::Json<ChatMessage>) -> impl Responder {
+    let response = api::get_response(&message.message).await.unwrap();
+    HttpResponse::Ok().json(ChatMessage { message: response })
+}
 
-    // Create OpenAI configuration
-    let openai_config = openai::config::OpenAIConfig::new(openai_api_key);
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    dotenv::dotenv().ok();
 
-    // Create OpenAI API instance
-    let openai_api = openai::api::OpenAIAPI::new(openai_config);
-
-    println!("Hello! I'm your friend chatbot. Type 'exit' to end the conversation.");
-
-    loop {
-        // Get user input
-        let user_input = chatbot::user_input::get_user_input();
-
-        // Check for exit command
-        if user_input.to_lowercase() == "exit" {
-            println!("Goodbye! Have a great day!");
-            break;
-        }
-
-        // Fetch response from OpenAI API
-        let openai_response = openai_api.fetch_response(&user_input);
-
-        // Generate and print chatbot response
-        let chatbot_response = chatbot::responses::generate_response(&user_input);
-        println!("Chatbot's response: {}", chatbot_response);
-    }
+    HttpServer::new(|| {
+        App::new()
+            .service(web::resource("/chatbot").route(web::post().to(chatbot)))
+    })
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
 }
